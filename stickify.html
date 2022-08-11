@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>Stickify</title>
+        
+        <link rel="icon" href="">
+        <style>
+        
+        html {
+            height: 100%;
+        }
+        
+        body {
+            display: flex;
+            flex-direction: column;
+            
+            margin: 0;
+            min-height: 100%;
+            height: 0;
+        }
+        
+        main {
+            display: flex;
+            
+            height: 0;
+            
+            flex-grow: 1;
+        }
+        
+        section {
+            flex-grow: 1;
+        }
+        
+        </style>
+        <style>
+        
+        body {
+            font-family: Segoe UI;
+        }
+        
+        aside {
+            padding: 16px;
+            width: 224px;
+            
+            
+            background-color: lightGray;
+        }
+        
+        section {
+            background-color: gray;
+        }
+        
+        aside:nth-child(1) {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        #images-buttons {
+            display: flex;
+            flex-direction: column;
+            
+            padding-bottom: 16px;
+        }
+        
+        #images-buttons button {
+            width: 100%;
+        }
+        
+        #images {
+            display: flex;
+            flex-direction: column;
+            
+            background-color: darkGray;
+            
+            flex-grow: 1;
+            overflow-y: auto;
+        }
+        
+        #images > .image-row {
+            display: flex;
+            
+            position: relative;
+            
+            padding: 4px 0;
+            border-bottom: 1px solid white;
+            height: 48px;
+        }
+        
+        #images > .image-row .icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            
+            width: 48px;
+            height: 48px;
+            
+            background-color: dimGray;
+        }
+        
+        #images > .image-row img {
+            height: 100%;
+            
+            background-image: url("images/transparent_background.bmp");
+        }
+        
+        #images > .image-row .name {
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+            flex-grow: 1;
+        }
+        
+        #images > .image-row .remove-image {
+            user-select: none;
+        }
+        
+        #outputs {
+            width: 100%;
+            height: 100%;
+            
+            overflow: auto;
+        }
+        
+        #outputs .output {
+            display: inline-block;
+            
+            margin: 4px;
+            height: 256px;
+        }
+        
+        #outputs canvas {
+            height: 100%;
+            
+            background-image: url("images/transparent_background.bmp");
+            background-blend-mode: multiply;
+        }
+        
+        #settings {
+            font-size: 14px;
+        }
+        
+        #settings > .row {
+            display: flex;
+            align-items: center;
+            
+            margin: 4px 0 4px 0;
+        }
+        
+        #settings .input-label {
+            display: inline-block;
+            width: 128px;
+        }
+        
+        #settings input:not([type]),
+        #settings input[type=number] {
+            width: 80px;
+        }
+        
+        </style>
+        <style>
+        
+        input[type=checkbox] {
+            cursor: pointer;
+        }
+        
+        label[for] {
+            cursor: pointer;
+        }
+        
+        </style>
+        <style id="canvas-bg-color"></style>
+    </head>
+    <body>
+        <header></header>
+        
+        <main>
+            <aside>
+                <div id="images-buttons">
+                    <div>
+                        <input type="file" hidden multiple id="file-input">
+                        <button id="add-images" title="Import images by clicking this button, dragging them onto the page or pasting them with Ctrl + V.">Add Images</button>
+                    </div>
+                    <div>
+                        <button id="remove-images">Remove All Images</button>
+                    </div>
+                    <div>
+                        <button id="download-images">Download All Images</button>
+                    </div>
+                    
+                </div>
+                <div id="images"></div>
+            </aside>
+            <section>
+                <div id="outputs"></div>
+            </section>
+            <aside id="settings">
+                <div class="row">
+                    <span class="input-label">Outline Color</span>
+                    <input id="outline-color" value="#000000">
+                </div>
+                <div class="row">
+                    <span class="input-label">Radius</span>
+                    <input type="number" id="radius" value="8">
+                </div>
+                <div class="row">
+                    <span class="input-label">Level of detail</span>
+                    <input type="number" id="detail" value="128">
+                </div>
+                <div class="row" title="Only affects preview background, not the actual images.">
+                    <span class="input-label">Background Color</span>
+                    <input id="preview-bg" value="cyan">
+                </div>
+                <div class="row" title="Resizes images automatically to make sure the outline fits in. If unchecked, the image keeps its original size.">
+                    <input type="checkbox" id="auto-resize">
+                    <label for="auto-resize">Auto-Resize Images</label>
+                </div>
+                <div class="row" title="Removes images when importing new ones.">
+                    <input type="checkbox" id="remove-on-add">
+                    <label for="remove-on-add">Remove Older Images</label>
+                </div>
+                <div class="row" title="Uses Local Storage to save settings. Everything is cleared when this box is unchecked.">
+                    <input type="checkbox" id="save-on-exit">
+                    <label for="save-on-exit">Save on Exit</label>
+                </div>
+                
+            </aside>
+        </main>
+        
+        <footer></footer>
+        
+        <script>
+        
+        function img_outlined(img, outlineColor, radius, detail = 128, resize = true) {
+            const canvas = document.createElement("canvas");
+            const context = canvas.getContext("2d");
+            
+            if(resize) {
+                canvas.width = img.naturalWidth + radius * 2;
+                canvas.height = img.naturalHeight + radius * 2;
+            } else {
+                canvas.width = img.naturalWidth;
+                canvas.height = img.naturalHeight;
+            }
+            
+            const drawX = (canvas.width - img.naturalWidth) / 2;
+            const drawY = (canvas.height - img.naturalHeight) / 2;
+            
+            for(let i = 0; i < detail; ++i) {
+                const angle = i/detail * 2*Math.PI;
+                
+                context.drawImage(img, drawX + Math.cos(angle) * radius, drawY + Math.sin(angle) * radius);
+            }
+            
+            context.globalCompositeOperation = "source-in";
+            context.fillStyle = outlineColor;
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            context.globalCompositeOperation = "source-over";
+            
+            context.drawImage(img, drawX, drawY);
+            
+            return canvas;
+        }
+        
+        function downloadCanvas(canvas, name = "") {
+            const URLObj = window.URL || window.webkitURL;
+            
+            canvas.toBlob(function(blob) {
+                const source = URLObj.createObjectURL(blob);
+                
+                const a = document.createElement("a");
+                
+                a.href = source;
+                a.download = name;
+                
+                a.click();
+            });
+        }
+        
+        </script>
+        <script>
+        
+        const filesInput = document.querySelector("#file-input");
+        const addImagesButton = document.querySelector("#add-images");
+        const removeImagesButton = document.querySelector("#remove-images");
+        const downloadImagesButton = document.querySelector("#download-images");
+        
+        const imagesDiv = document.querySelector("#images");
+        
+        const outputsDiv = document.querySelector("#outputs");
+        
+        const outlineColorInput = document.querySelector("#outline-color");
+        const outlineRadiusInput = document.querySelector("#radius");
+        const outlineDetailInput = document.querySelector("#detail");
+        const previewBgStyle = document.querySelector("#canvas-bg-color");
+        const previewBgColorInput = document.querySelector("#preview-bg");
+        const autoResizeCheckbox = document.querySelector("#auto-resize");
+        const removeOnAddCheckbox = document.querySelector("#remove-on-add");
+        const saveOnExitCheckbox = document.querySelector("#save-on-exit");
+        
+        function updateOutput() {
+            const color = outlineColorInput.value;
+            const radius = Number(outlineRadiusInput.value);
+            const detail = Number(outlineDetailInput.value);
+            
+            Array.from(imagesDiv.querySelectorAll("img")).forEach(function(img) {
+                img.updateOutput();
+            });
+        }
+        
+        function addImage(...images) {
+            for(let i = 0; i < images.length; ++i) {
+                const img = images[i];
+                
+                const output = document.createElement("div");
+                
+                output.className = "output";
+                output.name = img.name;
+                
+                outputsDiv.appendChild(output);
+                
+                img.updateOutput = function() {
+                    if(img.parentElement === null) {
+                        output.remove();
+                    } else {
+                        const color = outlineColorInput.value;
+                        const radius = Number(outlineRadiusInput.value);
+                        const detail = Number(outlineDetailInput.value);
+                        const autoResize = autoResizeCheckbox.checked;
+                        
+                        output.innerHTML = "";
+                        
+                        output.appendChild(img_outlined(img, color, radius, detail, autoResize));
+                    }
+                };
+                
+                imagesDiv.appendChild((function() {
+                    const span = document.createElement("span");
+                    
+                    span.className = "image-row";
+                    span.title = img.name;
+                    
+                    span.appendChild((function() {
+                        const span = document.createElement("span");
+                        
+                        span.className = "icon";
+                        
+                        span.appendChild(img);
+                        
+                        return span;
+                    })());
+                    
+                    span.appendChild((function() {
+                        const span = document.createElement("span");
+                        
+                        span.className = "name";
+                        
+                        span.innerText = img.name;
+                        
+                        return span;
+                    })());
+                    
+                    span.appendChild((function() {
+                        const div = document.createElement("div");
+                        
+                        div.appendChild((function() {
+                            const button = document.createElement("button");
+                            
+                            button.className = "remove-image";
+                            
+                            button.innerText = "×";
+                            
+                            button.addEventListener("click", function() {
+                                span.remove();
+                                output.remove();
+                            });
+                            
+                            return button;
+                        })());
+                        
+                        return div;
+                    })());
+                    
+                    return span;
+                })());
+                
+                
+                
+                if(img.complete) {
+                    img.updateOutput();
+                } else {
+                    img.onload = function() {
+                        img.updateOutput();
+                    };
+                }
+            }
+        }
+        
+        function removeAllImages() {
+            imagesDiv.innerHTML = "";
+            outputsDiv.innerHTML = "";
+        }
+        
+        function addImageFiles(files) {
+            files = Array.from(files).filter(function(file) {
+                return file.type.match(/^image\//) !== null;
+            });
+            
+            if(removeOnAddCheckbox.checked && files.length > 0) {
+                removeAllImages();
+            }
+            
+            for(let i = 0; i < files.length; ++i) {
+                const img = document.createElement("img");
+                
+                img.name = files[i].name;
+                
+                addImage(img);
+                
+                const fileReader = new FileReader();
+                
+                fileReader.addEventListener("load", function() {
+                    img.src = this.result;
+                });
+                
+                fileReader.readAsDataURL(files[i]);
+            }
+        }
+        
+        filesInput.addEventListener("input", function() {
+            addImageFiles(this.files);
+        });
+        
+        addImagesButton.addEventListener("click", function() {
+            filesInput.click();
+        });
+        
+        removeImagesButton.addEventListener("click", function() {
+            removeAllImages();
+        });
+        
+        downloadImagesButton.addEventListener("click", function() {
+            Array.from(outputsDiv.querySelectorAll(".output")).forEach(function(outputElement) {
+                const downloadName = outputElement.name;
+                const canvas = outputElement.querySelector("canvas");
+                
+                downloadCanvas(canvas, downloadName);
+            });
+        });
+        
+        
+        
+        outlineColorInput.addEventListener("input", function() {
+            updateOutput();
+        });
+        
+        outlineRadiusInput.addEventListener("input", function() {
+            updateOutput();
+        });
+        
+        outlineDetailInput.addEventListener("input", function() {
+            updateOutput();
+        });
+        
+        autoResizeCheckbox.addEventListener("input", function() {
+            updateOutput();
+        });
+        
+        previewBgColorInput.addEventListener("input", function() {
+            if(this.value === "") {
+                previewBgStyle.innerText = "";
+            } else {
+                previewBgStyle.innerText = ".output canvas { background-color: " + this.value + "; }";
+            }
+        });
+        
+        previewBgColorInput.dispatchEvent(new Event("input"));
+        
+        
+        
+        addEventListener("dragover", function(event) {
+            event.preventDefault();
+            event.returnValue = false;
+            
+            return false;
+        });
+        
+        addEventListener("drop", function(event) {
+            event.preventDefault();
+            event.returnValue = false;
+            
+            const files = event.dataTransfer.files;
+            
+            if(files.length > 0) {
+                addImageFiles(files);
+            }
+            
+            return false;
+        });
+        
+        addEventListener("paste", function(event) {
+            const files = Array.from(event.clipboardData.items).filter(function(item) {
+                return item.kind === "file";
+            }).map(function(item) {
+                return item.getAsFile();
+            });
+            
+            if(files.length > 0) {
+                addImageFiles(files);
+            }
+        });
+        
+        ////  ////
+        
+        ["example0.png"].forEach(function(fileName) {
+            const img = document.createElement("img");
+            
+            img.name = fileName;
+            img.src = "images/" + fileName;
+            
+            addImage(img);
+        });
+        
+        ////  ////
+        
+        {
+            const key = "U3RpY2tpZnk=";
+            
+            addEventListener("load", function() {
+                const value = localStorage.getItem(key);
+                
+                if(value !== null) {
+                    try {
+                        const settings = JSON.parse(value);
+                        
+                        console.log("Settings from last session:", settings);
+                        
+                        outlineColorInput.value = settings["outline-color"];
+                        outlineRadiusInput.value = settings["radius"];
+                        outlineDetailInput.value = settings["detail"];
+                        autoResizeCheckbox.checked = settings["auto-resize"];
+                        updateOutput();
+                        
+                        previewBgColorInput.value = settings["preview-bg"];
+                        previewBgColorInput.dispatchEvent(new Event("input"));
+                        
+                        removeOnAddCheckbox.checked = settings["remove-on-add"];
+                        
+                        saveOnExitCheckbox.checked = true;
+                    } catch(e) {
+                        localStorage.removeItem(key);
+                    }
+                } else {
+                    
+                }
+            });
+            
+            addEventListener("beforeunload", function() {
+                if(saveOnExitCheckbox.checked) {
+                    localStorage.setItem(key, JSON.stringify({
+                        "outline-color": outlineColorInput.value,
+                        "radius": outlineRadiusInput.value,
+                        "detail": outlineDetailInput.value,
+                        "preview-bg": previewBgColorInput.value,
+                        "auto-resize": autoResizeCheckbox.checked,
+                        "remove-on-add": removeOnAddCheckbox.checked,
+                    }));
+                } else {
+                    localStorage.removeItem(key);
+                }
+            });
+            
+        }
+        
+        </script>
+    </body>
+</html>
